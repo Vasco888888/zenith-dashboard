@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { 
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -146,35 +146,51 @@ function App() {
     return num.toLocaleString();
   };
 
+  // Calculate price range for candlestick chart
+  const candlePriceRange = useMemo(() => {
+    if (!candleData || candleData.length === 0) return { min: 0, max: 100 };
+    const lows = candleData.map(d => d.low);
+    const highs = candleData.map(d => d.high);
+    return {
+      min: Math.min(...lows),
+      max: Math.max(...highs)
+    };
+  }, [candleData]);
+
   const CustomCandlestick = (props) => {
-    const { x, y, width, height, payload } = props;
+    const { x, y, width, height, payload, background } = props;
     if (!payload || payload.open === undefined) return null;
     
     const { open, close, high, low } = payload;
     const isGreen = close >= open;
     const color = isGreen ? '#10b981' : '#ef4444';
     
-    // Calculate positions based on the y-axis scale
-    const range = high - low;
-    if (range === 0) return null;
+    if (high === low) return null;
     
     const candleWidth = Math.max(width * 0.6, 4);
     const xCenter = x + width / 2;
     const xLeft = xCenter - candleWidth / 2;
     
-    // Calculate body position (the filled rectangle)
-    const bodyTop = isGreen ? close : open;
-    const bodyBottom = isGreen ? open : close;
-    const bodyHeight = Math.abs(close - open);
+    // Use background to get the full chart area
+    const chartHeight = background?.height || 400;
+    const chartY = background?.y || 0;
     
-    // Scale factor: height of the bar corresponds to (high - low)
-    const scale = height / range;
+    // Calculate scale using the overall price range from candlePriceRange
+    const priceMin = candlePriceRange.min;
+    const priceMax = candlePriceRange.max;
+    const priceRange = priceMax - priceMin || 1;
     
-    const wickTop = y;
-    const wickBottom = y + height;
-    const bodyYTop = y + (high - bodyTop) * scale;
-    const bodyYBottom = y + (high - bodyBottom) * scale;
-    const bodyHeightScaled = Math.max(bodyYBottom - bodyYTop, 1);
+    // Scale: pixels per dollar (inverted because SVG y increases downward)
+    const scale = chartHeight / priceRange;
+    
+    // Convert price to Y position (higher price = lower Y in SVG)
+    const priceToY = (price) => chartY + (priceMax - price) * scale;
+    
+    const wickTop = priceToY(high);
+    const wickBottom = priceToY(low);
+    const bodyTop = priceToY(Math.max(open, close));
+    const bodyBottom = priceToY(Math.min(open, close));
+    const bodyHeightScaled = Math.max(bodyBottom - bodyTop, 1);
 
     return (
       <g>
@@ -190,7 +206,7 @@ function App() {
         {/* Body (open to close rectangle) */}
         <rect 
           x={xLeft} 
-          y={bodyYTop} 
+          y={bodyTop} 
           width={candleWidth} 
           height={bodyHeightScaled} 
           fill={color}
@@ -554,7 +570,7 @@ function App() {
                     />
                     <YAxis 
                       yAxisId="price" 
-                      domain={['dataMin', 'dataMax']} 
+                      domain={[candlePriceRange.min, candlePriceRange.max]} 
                       stroke="#525252"
                       tick={{ fill: '#737373', fontSize: 12 }}
                       tickFormatter={(value) => `$${value}`}
@@ -596,6 +612,7 @@ function App() {
                       shape={<CustomCandlestick />}
                       isAnimationActive={false}
                       legendType="none"
+                      background={{ fill: 'transparent' }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
