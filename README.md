@@ -1,4 +1,4 @@
-# 🚀 ZENITH | Real-Time Financial Terminal
+# ZENITH | Real-Time Financial Dashboard
 
 ![Project Status](https://img.shields.io/badge/status-active-success)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -8,7 +8,7 @@
 Unlike simple dashboards, Zenith implements a **custom proxy architecture** with **Server-Side Redis Caching** to handle high-traffic data requests, mitigate third-party API rate limits (HTTP 429), and reduce latency.
 
 ![Zenith Dashboard Screenshot](./screenshot.png)
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 * **React.js (Vite)** - Component-based UI.
@@ -23,7 +23,7 @@ Unlike simple dashboards, Zenith implements a **custom proxy architecture** with
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
 * **Real-Time Data Search:** Instant access to 10,000+ US Stock tickers (e.g., AAPL, TSLA, NVDA).
 * **Intelligent Caching:** Implements Redis to cache API responses (60s TTL), preventing redundant external calls and solving API rate-limiting issues.
@@ -33,7 +33,7 @@ Unlike simple dashboards, Zenith implements a **custom proxy architecture** with
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these steps to run Zenith locally.
 

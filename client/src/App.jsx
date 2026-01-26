@@ -13,7 +13,7 @@ function App() {
   const [error, setError] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
-  const [timeRange, setTimeRange] = useState('30');
+  const [timeRange, setTimeRange] = useState('1M'); // Agora usa códigos: 1W, 1M, 3M, 6M, 1Y
   const [chartType, setChartType] = useState('area');
   const [loading, setLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -38,10 +38,18 @@ function App() {
       return;
     }
 
+    // Limpar erro quando utilizador começa a pesquisar
+    setError(null);
+
     const timer = setTimeout(async () => {
       try {
         const response = await axios.get(`http://localhost:5000/api/search/${ticker}`);
-        setSearchResults(response.data.data?.slice(0, 5) || []);
+        const results = response.data.data || [];
+        // Filtrar duplicados por símbolo (mantém apenas o primeiro de cada)
+        const uniqueResults = results.filter((item, index, self) => 
+          index === self.findIndex(t => t.symbol === item.symbol)
+        ).slice(0, 5);
+        setSearchResults(uniqueResults);
       } catch (err) {
         console.error('Search error:', err);
       }
@@ -50,18 +58,25 @@ function App() {
     return () => clearTimeout(timer);
   }, [ticker]);
 
-  const fetchStock = async (symbol) => {
+  const fetchStock = async (symbol, range = null) => {
     if (!symbol) return;
+    const selectedRange = range || timeRange; // Usa o range passado ou o do state
     setLoading(true);
     setError(null);
     setTicker(symbol);
     setSearchResults([]);
 
     try {
+      // Enviar range como parâmetro para ambos os endpoints
       const [stockResponse, candlesResponse] = await Promise.all([
-        axios.get(`http://localhost:5000/api/stock/${symbol}`),
-        axios.get(`http://localhost:5000/api/candles/${symbol}?outputsize=${timeRange}`)
+        axios.get(`http://localhost:5000/api/stock/${symbol}?range=${selectedRange}`),
+        axios.get(`http://localhost:5000/api/candles/${symbol}?range=${selectedRange}`)
       ]);
+
+      // Verificar se os dados são válidos
+      if (!stockResponse.data || !stockResponse.data.price || isNaN(stockResponse.data.price)) {
+        throw new Error('Invalid stock data');
+      }
 
       setStockData(stockResponse.data);
 
@@ -85,7 +100,8 @@ function App() {
       }
 
     } catch (err) {
-      setError("Stock not found. Try 'AAPL' or 'TSLA'");
+      console.error('Fetch error:', err);
+      setError("Stock not found or not available. Note: Free API only supports US exchanges. For European stocks, try their US ADR (e.g., EDPFY for EDP)");
       setStockData(null);
       setCandleData(null);
       setFundamentals(null);
@@ -130,33 +146,25 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-mesh noise-overlay text-white font-sans">
-      {/* Floating gradient orbs for visual interest */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-float delay-300" />
-        <div className="absolute -bottom-40 right-1/4 w-72 h-72 bg-pink-500/15 rounded-full blur-3xl animate-float delay-500" />
-      </div>
-
+    <div className="min-h-screen bg-gray-900 text-white font-sans">
       <div className="relative z-10 p-4 md:p-8 lg:p-12">
         {/* Header */}
         <div className="max-w-7xl mx-auto">
           <header className="mb-12 animate-fade-in">
             <div className="flex items-center gap-4 mb-3">
               <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center animate-gradient">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-300 to-yellow-500 flex items-center justify-center" style={{width: '48px', height: '48px'}}>
+                  <svg style={{width: '28px', height: '28px'}} className="text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                   </svg>
                 </div>
-                <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 blur opacity-40 animate-gradient" />
               </div>
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gradient">
                   ZENITH
                 </h1>
-                <p className="text-gray-400 text-sm md:text-base tracking-wide">
-                  Real-Time Financial Terminal
+                <p className="text-neutral-500 text-sm md:text-base tracking-wide">
+                  Real-Time Financial Dashboard
                 </p>
               </div>
             </div>
@@ -166,9 +174,8 @@ function App() {
           <div className="relative mb-10 animate-fade-in delay-100">
             <div className="flex gap-3 md:gap-4">
               <div className="flex-1 relative group">
-                <div className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 blur transition-all duration-500 ${searchFocused ? 'opacity-70' : 'group-hover:opacity-50'}`} />
                 <div className="relative flex items-center">
-                  <div className="absolute left-4 text-gray-400">
+                  <div className="absolute left-4 text-neutral-500">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -180,30 +187,33 @@ function App() {
                     onChange={(e) => setTicker(e.target.value.toUpperCase())}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                    className="w-full py-4 pl-12 pr-4 rounded-2xl bg-gray-900/80 text-white font-medium text-lg outline-none transition-all duration-300 border border-gray-700/50 focus:border-purple-500/50 backdrop-blur-xl placeholder:text-gray-500"
+                    className="w-full py-4 pl-12 pr-4 rounded-2xl bg-gray-800 text-white font-medium text-lg outline-none transition-all duration-300 border border-gray-700 focus:border-amber-500/50 placeholder:text-gray-500"
                     onKeyDown={(e) => e.key === 'Enter' && fetchStock(ticker)}
                   />
                 </div>
                 
                 {/* Search Results Dropdown */}
                 {searchResults.length > 0 && (
-                  <div className="absolute top-full mt-3 w-full search-dropdown rounded-2xl overflow-hidden z-50 animate-fade-in-scale">
+                  <div className="absolute top-full mt-3 w-full search-dropdown rounded-2xl overflow-hidden z-[100] animate-fade-in-scale">
                     {searchResults.map((result, idx) => (
                       <div 
                         key={idx}
                         onClick={() => fetchStock(result.symbol)}
-                        className="p-4 hover:bg-gray-700/50 cursor-pointer border-b border-gray-700/50 last:border-0 transition-all duration-200 group"
+                        className="p-4 hover:bg-gray-700/50 cursor-pointer border-b border-gray-700 last:border-0 transition-all duration-200 group"
                       >
                         <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-bold text-white group-hover:text-blue-400 transition-colors">{result.symbol}</span>
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-400">Stock</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white group-hover:text-amber-400 transition-colors">{result.symbol}</span>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{result.exchange || 'Stock'}</span>
+                            {result.country && (
+                              <span className="text-xs text-gray-500">{result.country}</span>
+                            )}
                           </div>
-                          <svg className="w-4 h-4 text-gray-500 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg style={{width: '16px', height: '16px'}} className="text-neutral-600 group-hover:text-amber-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </div>
-                        <div className="text-sm text-gray-400 mt-1 truncate">{result.instrument_name}</div>
+                        <div className="text-sm text-neutral-500 mt-1 truncate">{result.instrument_name}</div>
                       </div>
                     ))}
                   </div>
@@ -217,7 +227,7 @@ function App() {
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                     <span className="hidden md:inline">Loading...</span>
                   </>
                 ) : (
@@ -233,12 +243,12 @@ function App() {
 
             {/* Popular Stocks */}
             <div className="flex gap-2 mt-5 flex-wrap items-center">
-              <span className="text-gray-500 text-sm font-medium mr-1">Trending:</span>
+              <span className="text-neutral-600 text-sm font-medium mr-1">Trending:</span>
               {POPULAR_STOCKS.map((stock, idx) => (
                 <button
                   key={stock}
                   onClick={() => fetchStock(stock)}
-                  className="tag-pill px-4 py-1.5 rounded-full text-sm font-medium text-blue-300 hover:text-white"
+                  className="tag-pill px-4 py-1.5 rounded-full text-sm font-medium text-amber-400 hover:text-amber-300"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >
                   {stock}
@@ -250,14 +260,14 @@ function App() {
           {/* Watchlist Section */}
           {watchlist.length > 0 && (
             <div className="mb-10 glass-strong p-6 rounded-2xl animate-fade-in">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-3 text-gray-200">
-                <span className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-3 text-neutral-200">
+                <span className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                   </svg>
                 </span>
                 Your Watchlist
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700/50 text-gray-400">{watchlist.length} items</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{watchlist.length} items</span>
               </h2>
               <div className="flex gap-3 flex-wrap">
                 {watchlist.map((symbol, idx) => (
@@ -268,7 +278,7 @@ function App() {
                   >
                     <button 
                       onClick={() => fetchStock(symbol)}
-                      className="font-mono font-semibold hover:text-blue-400 transition-colors text-white"
+                      className="font-mono font-semibold hover:text-amber-400 transition-colors text-white"
                     >
                       {symbol}
                     </button>
@@ -300,12 +310,12 @@ function App() {
 
           {/* Stock Data Display */}
           {stockData && (
-            <div className="glass-strong p-6 md:p-8 rounded-3xl stock-card animate-fade-in border border-gray-700/50">
+            <div className="bg-gray-800 p-6 md:p-8 rounded-3xl stock-card animate-fade-in border border-gray-700">
               
               {/* Header with Stock Info */}
               <div className="flex justify-between items-start mb-8 flex-wrap gap-6">
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-gray-700/50">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-300/20 to-yellow-500/20 flex items-center justify-center border border-amber-500/50">
                     <span className="text-2xl font-bold text-gradient">{stockData.symbol?.slice(0, 2)}</span>
                   </div>
                   <div>
@@ -314,33 +324,33 @@ function App() {
                       {!watchlist.includes(stockData.symbol) && (
                         <button 
                           onClick={() => addToWatchlist(stockData.symbol)}
-                          className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center hover:bg-yellow-500/20 transition-all group"
+                          className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/50 flex items-center justify-center hover:bg-amber-500/20 transition-all group"
                           title="Add to watchlist"
                         >
-                          <svg className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                           </svg>
                         </button>
                       )}
                       {watchlist.includes(stockData.symbol) && (
-                        <div className="w-10 h-10 rounded-xl bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                           </svg>
                         </div>
                       )}
                     </div>
-                    <p className="text-gray-400 flex items-center gap-2">
+                    <p className="text-neutral-500 flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      {timeRange} Day{timeRange > 1 ? 's' : ''} Performance
+                      {timeRange === '1W' ? '1 Week' : timeRange === '1M' ? '1 Month' : timeRange === '3M' ? '3 Months' : timeRange === '6M' ? '6 Months' : '1 Year'} Performance
                     </p>
                   </div>
                 </div>
                 
                 <div className="text-right">
-                  <p className="text-4xl md:text-5xl font-mono font-bold price-ticker count-up tracking-tight">
+                  <p className="text-4xl md:text-5xl font-mono font-bold price-ticker count-up tracking-tight text-amber-400">
                     ${stockData.price.toFixed(2)}
                   </p>
                   <div className={`inline-flex items-center gap-2 mt-2 px-4 py-1.5 rounded-full text-lg font-semibold ${stockData.percentChange >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
@@ -361,24 +371,24 @@ function App() {
               {/* Chart Controls */}
               <div className="flex gap-4 mb-6 flex-wrap">
               {/* Time Range Selector */}
-              <div className="flex gap-2 p-1.5 bg-gray-800/50 rounded-xl border border-gray-700/50">
+              <div className="flex gap-2 p-1.5 bg-gray-800 rounded-xl border border-gray-700">
                 {[
-                  { label: '1W', value: '7' },
-                  { label: '1M', value: '30' },
-                  { label: '3M', value: '90' },
-                  { label: '6M', value: '180' },
-                  { label: '1Y', value: '365' }
+                  { label: '1W', value: '1W' },
+                  { label: '1M', value: '1M' },
+                  { label: '3M', value: '3M' },
+                  { label: '6M', value: '6M' },
+                  { label: '1Y', value: '1Y' }
                 ].map(range => (
                   <button
                     key={range.value}
                     onClick={() => {
                       setTimeRange(range.value);
-                      fetchStock(stockData.symbol);
+                      fetchStock(stockData.symbol, range.value); // Passa o range diretamente
                     }}
                     className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
                       timeRange === range.value 
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg' 
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                        ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
                     }`}
                   >
                     {range.label}
@@ -387,13 +397,13 @@ function App() {
               </div>
 
               {/* Chart Type Selector */}
-              <div className="flex gap-2 p-1.5 bg-gray-800/50 rounded-xl border border-gray-700/50">
+              <div className="flex gap-2 p-1.5 bg-gray-800 rounded-xl border border-gray-700">
                 <button
                   onClick={() => setChartType('area')}
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
                     chartType === 'area' 
-                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                      ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700'
                   }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,8 +415,8 @@ function App() {
                   onClick={() => setChartType('candlestick')}
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
                     chartType === 'candlestick' 
-                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                      ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700'
                   }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -424,40 +434,40 @@ function App() {
                   <AreaChart data={stockData.history}>
                     <defs>
                       <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.5}/>
-                        <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.4}/>
+                        <stop offset="50%" stopColor="#d97706" stopOpacity={0.15}/>
+                        <stop offset="100%" stopColor="#d97706" stopOpacity={0}/>
                       </linearGradient>
                       <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#3b82f6"/>
-                        <stop offset="50%" stopColor="#8b5cf6"/>
-                        <stop offset="100%" stopColor="#ec4899"/>
+                        <stop offset="0%" stopColor="#fbbf24"/>
+                        <stop offset="50%" stopColor="#f59e0b"/>
+                        <stop offset="100%" stopColor="#d97706"/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" strokeOpacity={0.5} />
                     <XAxis 
                       dataKey="date" 
-                      stroke="#6b7280" 
-                      tick={{ fill: '#9ca3af', fontSize: 12 }}
-                      axisLine={{ stroke: '#374151' }}
+                      stroke="#525252" 
+                      tick={{ fill: '#737373', fontSize: 12 }}
+                      axisLine={{ stroke: '#262626' }}
                     />
                     <YAxis 
                       domain={['auto', 'auto']} 
-                      stroke="#6b7280"
-                      tick={{ fill: '#9ca3af', fontSize: 12 }}
-                      axisLine={{ stroke: '#374151' }}
+                      stroke="#525252"
+                      tick={{ fill: '#737373', fontSize: 12 }}
+                      axisLine={{ stroke: '#262626' }}
                       tickFormatter={(value) => `$${value}`}
                     />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'rgba(17, 24, 39, 0.95)', 
-                        borderColor: 'rgba(75, 85, 99, 0.5)', 
+                        backgroundColor: 'rgba(0, 0, 0, 0.95)', 
+                        borderColor: 'rgba(251, 191, 36, 0.3)', 
                         borderRadius: '12px',
                         color: '#fff',
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)'
+                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)'
                       }} 
-                      itemStyle={{ color: '#a78bfa' }}
-                      labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
+                      itemStyle={{ color: '#fbbf24' }}
+                      labelStyle={{ color: '#737373', marginBottom: '4px' }}
                       formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
                     />
                     <Area 
@@ -479,37 +489,37 @@ function App() {
                   <ComposedChart data={candleData}>
                     <defs>
                       <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4b5563" stopOpacity={0.5}/>
-                        <stop offset="100%" stopColor="#374151" stopOpacity={0.1}/>
+                        <stop offset="0%" stopColor="#404040" stopOpacity={0.5}/>
+                        <stop offset="100%" stopColor="#262626" stopOpacity={0.1}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" strokeOpacity={0.5} />
                     <XAxis 
                       dataKey="date" 
-                      stroke="#6b7280"
-                      tick={{ fill: '#9ca3af', fontSize: 12 }}
+                      stroke="#525252"
+                      tick={{ fill: '#737373', fontSize: 12 }}
                     />
                     <YAxis 
                       yAxisId="price" 
                       domain={['auto', 'auto']} 
-                      stroke="#6b7280"
-                      tick={{ fill: '#9ca3af', fontSize: 12 }}
+                      stroke="#525252"
+                      tick={{ fill: '#737373', fontSize: 12 }}
                       tickFormatter={(value) => `$${value}`}
                     />
                     <YAxis 
                       yAxisId="volume" 
                       orientation="right" 
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
+                      stroke="#525252"
+                      tick={{ fill: '#525252', fontSize: 11 }}
                       tickFormatter={(value) => formatNumber(value)}
                     />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'rgba(17, 24, 39, 0.95)', 
-                        borderColor: 'rgba(75, 85, 99, 0.5)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.95)', 
+                        borderColor: 'rgba(251, 191, 36, 0.3)',
                         borderRadius: '12px',
                         color: '#fff',
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)'
+                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)'
                       }}
                       formatter={(value, name) => {
                         if (name === 'volume') return [formatNumber(value), 'Volume'];
@@ -518,28 +528,33 @@ function App() {
                     />
                     <Legend 
                       wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-gray-400">{value}</span>}
+                      formatter={(value) => <span className="text-neutral-400">{value}</span>}
                     />
                     <Bar yAxisId="volume" dataKey="volume" fill="url(#volumeGradient)" radius={[4, 4, 0, 0]} />
                     <Line 
                       yAxisId="price" 
                       type="monotone" 
                       dataKey="close" 
-                      stroke="#8b5cf6" 
+                      stroke="#f59e0b" 
                       strokeWidth={2}
                       dot={false}
-                      activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#1f2937', strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: '#f59e0b', stroke: '#000', strokeWidth: 2 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
 
-            {/* Fundamentals Section */}
+            {/* Fundamentals Section - só mostra se houver dados */}
             {fundamentals && (
-              <div className="mt-8 pt-8 border-t border-gray-700/50">
-                <h3 className="text-lg font-semibold mb-5 flex items-center gap-2 text-gray-300">
-                  <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              fundamentals.statistics?.valuations_metrics?.market_capitalization ||
+              fundamentals.statistics?.valuations_metrics?.pe_ratio ||
+              fundamentals.statistics?.stock_price_summary?.fifty_two_week_high ||
+              fundamentals.statistics?.stock_price_summary?.fifty_two_week_low
+            ) && (
+              <div className="mt-8 pt-8 border-t border-gray-700">
+                <h3 className="text-lg font-semibold mb-5 flex items-center gap-2 text-neutral-300">
+                  <svg style={{width: '20px', height: '20px'}} className="text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                   Key Statistics
@@ -547,25 +562,25 @@ function App() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {fundamentals.statistics?.valuations_metrics?.market_capitalization && (
                     <div className="stat-card">
-                      <p className="text-gray-400 text-sm mb-1">Market Cap</p>
-                      <p className="text-xl font-bold font-mono-numbers">{fundamentals.statistics.valuations_metrics.market_capitalization}</p>
+                      <p className="text-neutral-500 text-sm mb-1">Market Cap</p>
+                      <p className="text-xl font-bold font-mono-numbers text-amber-400">${formatNumber(fundamentals.statistics.valuations_metrics.market_capitalization)}</p>
                     </div>
                   )}
                   {fundamentals.statistics?.valuations_metrics?.pe_ratio && (
                     <div className="stat-card">
-                      <p className="text-gray-400 text-sm mb-1">P/E Ratio</p>
-                      <p className="text-xl font-bold font-mono-numbers">{fundamentals.statistics.valuations_metrics.pe_ratio}</p>
+                      <p className="text-neutral-500 text-sm mb-1">P/E Ratio</p>
+                      <p className="text-xl font-bold font-mono-numbers">{parseFloat(fundamentals.statistics.valuations_metrics.pe_ratio).toFixed(2)}</p>
                     </div>
                   )}
                   {fundamentals.statistics?.stock_price_summary?.fifty_two_week_high && (
                     <div className="stat-card">
-                      <p className="text-gray-400 text-sm mb-1">52W High</p>
+                      <p className="text-neutral-500 text-sm mb-1">52W High</p>
                       <p className="text-xl font-bold font-mono-numbers text-emerald-400">${fundamentals.statistics.stock_price_summary.fifty_two_week_high}</p>
                     </div>
                   )}
                   {fundamentals.statistics?.stock_price_summary?.fifty_two_week_low && (
                     <div className="stat-card">
-                      <p className="text-gray-400 text-sm mb-1">52W Low</p>
+                      <p className="text-neutral-500 text-sm mb-1">52W Low</p>
                       <p className="text-xl font-bold font-mono-numbers text-red-400">${fundamentals.statistics.stock_price_summary.fifty_two_week_low}</p>
                     </div>
                   )}
@@ -578,23 +593,23 @@ function App() {
         {/* Empty State */}
         {!stockData && !loading && !error && (
           <div className="text-center py-20 animate-fade-in">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-700/50 mb-6">
-              <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center rounded-3xl bg-gradient-to-br from-amber-300/10 to-yellow-500/10 border border-amber-500/50 mb-6" style={{width: '96px', height: '96px'}}>
+              <svg style={{width: '48px', height: '48px'}} className="text-amber-500/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
-            <h3 className="text-2xl font-semibold text-gray-400 mb-2">Start Exploring</h3>
-            <p className="text-gray-500 max-w-md mx-auto">Search for a stock symbol above or click on one of the trending stocks to view real-time data and charts.</p>
+            <h3 className="text-2xl font-semibold text-neutral-400 mb-2">Start Exploring</h3>
+            <p className="text-neutral-600 max-w-md mx-auto">Search for a stock symbol above or click on one of the trending stocks to view real-time data and charts.</p>
           </div>
         )}
 
         {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-gray-800/50 text-center">
+        <footer className="mt-16 pt-8 border-t border-gray-800 text-center">
           <p className="text-gray-600 text-sm">
-            Built with ❤️ • Data provided by Twelve Data API
+            Data provided by Twelve Data API
           </p>
         </footer>
-      </div>
+        </div>
       </div>
     </div>
   );
