@@ -87,6 +87,97 @@ app.get('/api/stock/:symbol', async (req, res) => {
     }
 });
 
+// --- SYMBOL SEARCH ENDPOINT ---
+app.get('/api/search/:query', async (req, res) => {
+    const query = req.params.query;
+    
+    try {
+        const cacheKey = `search:${query}`;
+        const cached = await client.get(cacheKey);
+        
+        if (cached) {
+            console.log(`⚡ Serving search results for "${query}" from cache`);
+            return res.json(JSON.parse(cached));
+        }
+
+        const response = await axios.get(`https://api.twelvedata.com/symbol_search`, {
+            params: { symbol: query, apikey: API_KEY }
+        });
+
+        await client.set(cacheKey, JSON.stringify(response.data), { EX: 3600 }); // Cache 1 hour
+        res.json(response.data);
+    } catch (error) {
+        console.error("Search Error:", error.message);
+        res.status(500).json({ error: "Search failed" });
+    }
+});
+
+// --- FUNDAMENTALS ENDPOINT ---
+app.get('/api/fundamentals/:symbol', async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    
+    try {
+        const cacheKey = `fundamentals:${symbol}`;
+        const cached = await client.get(cacheKey);
+        
+        if (cached) {
+            console.log(`⚡ Serving fundamentals for ${symbol} from cache`);
+            return res.json(JSON.parse(cached));
+        }
+
+        const [statsResponse, profileResponse] = await Promise.all([
+            axios.get(`https://api.twelvedata.com/statistics`, {
+                params: { symbol, apikey: API_KEY }
+            }),
+            axios.get(`https://api.twelvedata.com/profile`, {
+                params: { symbol, apikey: API_KEY }
+            })
+        ]);
+
+        const fundamentals = {
+            ...statsResponse.data,
+            ...profileResponse.data
+        };
+
+        await client.set(cacheKey, JSON.stringify(fundamentals), { EX: 600 }); // Cache 10 min
+        res.json(fundamentals);
+    } catch (error) {
+        console.error("Fundamentals Error:", error.message);
+        res.status(500).json({ error: "Fundamentals not available" });
+    }
+});
+
+// --- OHLC CANDLE DATA ENDPOINT ---
+app.get('/api/candles/:symbol', async (req, res) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const { interval = '1day', outputsize = 30 } = req.query;
+    
+    try {
+        const cacheKey = `candles:${symbol}:${interval}:${outputsize}`;
+        const cached = await client.get(cacheKey);
+        
+        if (cached) {
+            console.log(`⚡ Serving candles for ${symbol} from cache`);
+            return res.json(JSON.parse(cached));
+        }
+
+        const response = await axios.get(`https://api.twelvedata.com/time_series`, {
+            params: {
+                symbol,
+                interval,
+                outputsize,
+                apikey: API_KEY
+            }
+        });
+
+        await client.set(cacheKey, JSON.stringify(response.data), { EX: 60 });
+        res.json(response.data);
+    } catch (error) {
+        console.error("Candles Error:", error.message);
+        res.status(500).json({ error: "Candle data not available" });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
