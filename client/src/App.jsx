@@ -573,7 +573,7 @@ function App() {
                       domain={[candlePriceRange.min, candlePriceRange.max]} 
                       stroke="#525252"
                       tick={{ fill: '#737373', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value) => `$${value.toFixed(2)}`}
                     />
                     <Tooltip 
                       contentStyle={{ 
