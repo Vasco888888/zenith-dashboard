@@ -10,7 +10,7 @@ app.use(cors());
 const PORT = 5000;
 const API_KEY = process.env.TWELVE_DATA_KEY;
 
-console.log("DEBUG: API_KEY loaded:", API_KEY ? "✅ YES" : "❌ NO");
+console.log("DEBUG: API_KEY loaded:", API_KEY ? "YES" : "NO");
 console.log("DEBUG: API_KEY length:", API_KEY?.length || 0);
 
 // --- HELPER: Calcular timestamps baseado no range ---
@@ -63,7 +63,7 @@ client.on('error', (err) => console.log('Redis Client Error', err));
 // Temos de conectar ao Redis antes de iniciar o servidor
 (async () => {
     await client.connect();
-    console.log("✅ Conectado ao Redis com sucesso!");
+    console.log("Connected to Redis successfully!");
 })();
 
 app.get('/api/stock/:symbol', async (req, res) => {
@@ -77,12 +77,12 @@ app.get('/api/stock/:symbol', async (req, res) => {
         const cachedData = await client.get(cacheKey);
 
         if (cachedData) {
-            console.log(`⚡ Serving ${symbol} (${range}) from Redis Cache`);
+            console.log(`[CACHE] Serving ${symbol} (${range}) from Redis Cache`);
             return res.json(JSON.parse(cachedData));
         }
 
         // 2. Se não estiver em cache, buscar à API (Twelve Data)
-        console.log(`🌐 Fetching ${symbol} (${range}) from Twelve Data API...`);
+        console.log(`[API] Fetching ${symbol} (${range}) from Twelve Data API...`);
 
         // Busca cotação atual
         const quoteResponse = await axios.get(`https://api.twelvedata.com/quote`, {
@@ -91,6 +91,39 @@ app.get('/api/stock/:symbol', async (req, res) => {
                 apikey: API_KEY 
             }
         });
+
+        // Check for API errors in response body (Twelve Data returns 200 but with error in body)
+        if (quoteResponse.data.code === 429) {
+            return res.status(429).json({ 
+                error: "API rate limit exceeded", 
+                code: "RATE_LIMIT",
+                message: "API rate limit reached. Free tier allows 8 requests/minute and 800 requests/day. Please wait and try again."
+            });
+        }
+        
+        if (quoteResponse.data.code === 400 || quoteResponse.data.status === 'error') {
+            const msg = quoteResponse.data.message || '';
+            if (msg.includes('not found') || msg.includes('No data')) {
+                return res.status(404).json({ 
+                    error: "Stock not found", 
+                    code: "NOT_FOUND",
+                    message: "Stock symbol not found. Please check the ticker and try again."
+                });
+            }
+            return res.status(400).json({ 
+                error: "Exchange not supported", 
+                code: "NON_US_STOCK",
+                message: "This stock is not available. Free API only supports US exchanges."
+            });
+        }
+
+        if (!quoteResponse.data.close || isNaN(parseFloat(quoteResponse.data.close))) {
+            return res.status(404).json({ 
+                error: "Stock not found", 
+                code: "NOT_FOUND",
+                message: "Stock symbol not found or has no price data."
+            });
+        }
 
         // Busca histórico (Time Series - baseado no range)
         const historyResponse = await axios.get(`https://api.twelvedata.com/time_series`, {
@@ -123,7 +156,44 @@ app.get('/api/stock/:symbol', async (req, res) => {
     } catch (error) {
         console.error("Error:", error.message);
         console.error("Full Error:", error.response?.data || error.response?.status);
-        res.status(500).json({ error: "Stock not found or API error" });
+        
+        // Check for specific error types
+        const apiError = error.response?.data;
+        const statusCode = error.response?.status;
+        
+        // Rate limit exceeded (429 or API message)
+        if (statusCode === 429 || apiError?.code === 429 || apiError?.message?.includes('API rate limit')) {
+            return res.status(429).json({ 
+                error: "API rate limit exceeded", 
+                code: "RATE_LIMIT",
+                message: "You've reached the API limit (800 requests/day on free tier). Please wait and try again later."
+            });
+        }
+        
+        // Check if it's a non-US exchange error
+        if (apiError?.message?.includes('not available') || apiError?.code === 400) {
+            return res.status(400).json({ 
+                error: "Exchange not supported", 
+                code: "NON_US_STOCK",
+                message: "This stock is not available. Free API only supports US exchanges. For European stocks, try their US ADR."
+            });
+        }
+        
+        // Stock not found
+        if (apiError?.code === 404 || apiError?.status === 'error' || !quoteResponse?.data?.close) {
+            return res.status(404).json({ 
+                error: "Stock not found", 
+                code: "NOT_FOUND",
+                message: "Stock symbol not found. Please check the ticker and try again."
+            });
+        }
+        
+        // Generic error
+        res.status(500).json({ 
+            error: "API Error", 
+            code: "UNKNOWN",
+            message: "An error occurred while fetching stock data. Please try again."
+        });
     }
 });
 
@@ -136,7 +206,7 @@ app.get('/api/search/:query', async (req, res) => {
         const cached = await client.get(cacheKey);
         
         if (cached) {
-            console.log(`⚡ Serving search results for "${query}" from cache`);
+            console.log(`Serving search results for "${query}" from cache`);
             return res.json(JSON.parse(cached));
         }
 
@@ -161,7 +231,7 @@ app.get('/api/fundamentals/:symbol', async (req, res) => {
         const cached = await client.get(cacheKey);
         
         if (cached) {
-            console.log(`⚡ Serving fundamentals for ${symbol} from cache`);
+            console.log(`[CACHE] Serving fundamentals for ${symbol} from cache`);
             return res.json(JSON.parse(cached));
         }
 
@@ -200,11 +270,11 @@ app.get('/api/candles/:symbol', async (req, res) => {
         const cached = await client.get(cacheKey);
         
         if (cached) {
-            console.log(`⚡ Serving candles for ${symbol} (${range}) from cache`);
+            console.log(`[CACHE] Serving candles for ${symbol} (${range}) from cache`);
             return res.json(JSON.parse(cached));
         }
 
-        console.log(`🌐 Fetching candles for ${symbol} (${range}, ${outputsize} days)...`);
+        console.log(`Fetching candles for ${symbol} (${range}, ${outputsize} days)...`);
 
         const response = await axios.get(`https://api.twelvedata.com/time_series`, {
             params: {
@@ -222,7 +292,16 @@ app.get('/api/candles/:symbol', async (req, res) => {
         res.json(response.data);
     } catch (error) {
         console.error("Candles Error:", error.message);
-        res.status(500).json({ error: "Candle data not available" });
+        const apiError = error.response?.data;
+        const statusCode = error.response?.status;
+        
+        if (statusCode === 429 || apiError?.code === 429) {
+            return res.status(429).json({ error: "Rate limit exceeded", code: "RATE_LIMIT" });
+        }
+        if (apiError?.message?.includes('not available') || apiError?.code === 400) {
+            return res.status(400).json({ error: "Exchange not supported", code: "NON_US_STOCK" });
+        }
+        res.status(500).json({ error: "Candle data not available", code: "UNKNOWN" });
     }
 });
 

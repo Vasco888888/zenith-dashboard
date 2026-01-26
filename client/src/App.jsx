@@ -17,6 +17,7 @@ function App() {
   const [chartType, setChartType] = useState('area');
   const [loading, setLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const POPULAR_STOCKS = ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'NVDA', 'META', 'AMD'];
 
@@ -33,7 +34,8 @@ function App() {
 
   // Debounced search
   useEffect(() => {
-    if (ticker.length < 2) {
+    // Don't search if not actively searching or ticker too short
+    if (!isSearching || ticker.length < 2) {
       setSearchResults([]);
       return;
     }
@@ -56,13 +58,14 @@ function App() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [ticker]);
+  }, [ticker, isSearching]);
 
   const fetchStock = async (symbol, range = null) => {
     if (!symbol) return;
     const selectedRange = range || timeRange; // Use passed range or state value
     setLoading(true);
     setError(null);
+    setIsSearching(false);
     setTicker(symbol);
     setSearchResults([]);
 
@@ -101,7 +104,21 @@ function App() {
 
     } catch (err) {
       console.error('Fetch error:', err);
-      setError("Stock not found or not available. Note: Free API only supports US exchanges. For European stocks, try their US ADR (e.g., EDPFY for EDP)");
+      
+      // Get specific error from API response
+      const errorCode = err.response?.data?.code;
+      const errorMessage = err.response?.data?.message;
+      
+      if (errorCode === 'RATE_LIMIT') {
+        setError("API Rate Limit: Free tier allows 8 requests/minute and 800 requests/day. Please wait a moment and try again.");
+      } else if (errorCode === 'NON_US_STOCK') {
+        setError("Exchange Not Supported: Free API only supports US stocks. For European stocks, try their US ADR (e.g., EDPFY for EDP).");
+      } else if (errorCode === 'NOT_FOUND') {
+        setError("Stock Not Found: The ticker symbol doesn't exist. Please check the spelling and try again.");
+      } else {
+        setError(errorMessage || "An error occurred while fetching stock data. Please try again.");
+      }
+      
       setStockData(null);
       setCandleData(null);
       setFundamentals(null);
@@ -223,7 +240,10 @@ function App() {
                     type="text" 
                     placeholder="Search stocks (e.g., AAPL, TSLA, GOOGL)" 
                     value={ticker}
-                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      setTicker(e.target.value.toUpperCase());
+                      setIsSearching(true);
+                    }}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                     className="w-full py-4 pl-12 pr-4 rounded-2xl bg-gray-800 text-white font-medium text-lg outline-none transition-all duration-300 border border-gray-700 focus:border-amber-500/50 placeholder:text-gray-500"
