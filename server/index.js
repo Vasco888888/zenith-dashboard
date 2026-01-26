@@ -8,11 +8,18 @@ const app = express();
 app.use(cors());
 
 const PORT = 5000;
-const API_KEY = process.env.FINNHUB_KEY;
+const API_KEY = process.env.TWELVE_DATA_KEY;
+
+console.log("DEBUG: API_KEY loaded:", API_KEY ? "✅ YES" : "❌ NO");
+console.log("DEBUG: API_KEY length:", API_KEY?.length || 0);
 
 // --- CONFIGURAÇÃO REDIS ---
 const client = createClient({
-    url: process.env.REDIS_URL
+    url: process.env.REDIS_URL,
+    socket: {
+        tls: true,
+        rejectUnauthorized: false // This fixes most SSL connection issues
+    }
 });
 
 client.on('error', (err) => console.log('Redis Client Error', err));
@@ -36,44 +43,46 @@ app.get('/api/stock/:symbol', async (req, res) => {
             return res.json(JSON.parse(cachedData));
         }
 
-        // 2. Se não estiver em cache, buscar à API (Finnhub)
-        console.log(`🌐 Fetching ${symbol} from Finnhub API...`);
+        // 2. Se não estiver em cache, buscar à API (Twelve Data)
+        console.log(`🌐 Fetching ${symbol} from Twelve Data API...`);
 
-        // Busca histórico (Candles)
-        const historyResponse = await axios.get(`https://finnhub.io/api/v1/stock/candle`, {
-            params: {
-                symbol: symbol,
-                resolution: 'D',
-                from: Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60),
-                to: Math.floor(Date.now() / 1000),
-                token: API_KEY
+        // Busca cotação atual
+        const quoteResponse = await axios.get(`https://api.twelvedata.com/quote`, {
+            params: { 
+                symbol: symbol, 
+                apikey: API_KEY 
             }
         });
 
-        // Busca cotação atual
-        const quoteResponse = await axios.get(`https://finnhub.io/api/v1/quote`, {
-            params: { symbol: symbol, token: API_KEY }
+        // Busca histórico (Time Series - últimos 30 dias)
+        const historyResponse = await axios.get(`https://api.twelvedata.com/time_series`, {
+            params: {
+                symbol: symbol,
+                interval: '1day',
+                outputsize: 30,
+                apikey: API_KEY
+            }
         });
 
         // Montar o objeto
         const stockData = {
             symbol: symbol,
-            price: quoteResponse.data.c,
-            percentChange: quoteResponse.data.dp,
-            history: historyResponse.data.t ? historyResponse.data.t.map((timestamp, index) => ({
-                date: new Date(timestamp * 1000).toLocaleDateString(),
-                price: historyResponse.data.c[index]
+            price: parseFloat(quoteResponse.data.close),
+            percentChange: parseFloat(quoteResponse.data.percent_change),
+            history: historyResponse.data.values ? historyResponse.data.values.reverse().map(item => ({
+                date: new Date(item.datetime).toLocaleDateString(),
+                price: parseFloat(item.close)
             })) : []
         };
 
-        // 3. Guardar no Redis com expiração (Ex: 60 segundos)
-        // 'EX': 60 define que o Redis apaga isto automaticamente após 60s
-        await client.set(symbol, JSON.stringify(stockData), { EX: 60 });
+        // 3. Guardar no Redis com expiração (Ex: 30 segundos)
+        await client.set(symbol, JSON.stringify(stockData), { EX: 30 });
 
         res.json(stockData);
 
     } catch (error) {
         console.error("Error:", error.message);
+        console.error("Full Error:", error.response?.data || error.response?.status);
         res.status(500).json({ error: "Stock not found or API error" });
     }
 });

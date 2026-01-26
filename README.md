@@ -19,7 +19,7 @@ Unlike simple dashboards, Zenith implements a **custom proxy architecture** with
 ### Backend & Architecture
 * **Node.js & Express** - REST API Proxy server.
 * **Redis (Upstash)** - Distributed caching layer for performance optimization.
-* **Finnhub API** - External financial data provider.
+* **Twelve Data API** - External financial data provider (800 requests/day on free tier).
 
 ---
 
@@ -54,7 +54,7 @@ npm install
 Create a .env file in the server folder with your API keys:
 
 ```
-FINNHUB_KEY=your_finnhub_api_key
+TWELVE_DATA_KEY=your_twelve_data_api_key
 REDIS_URL=redis://default:password@your-redis-instance.upstash.io:6379
 ```
 
