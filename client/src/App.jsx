@@ -13,7 +13,7 @@ function App() {
   const [error, setError] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
-  const [timeRange, setTimeRange] = useState('1M'); // Agora usa códigos: 1W, 1M, 3M, 6M, 1Y
+  const [timeRange, setTimeRange] = useState('1M'); // Time range codes: 1W, 1M, 3M, 6M, 1Y
   const [chartType, setChartType] = useState('area');
   const [loading, setLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -38,14 +38,14 @@ function App() {
       return;
     }
 
-    // Limpar erro quando utilizador começa a pesquisar
+    // Clear error when user starts searching
     setError(null);
 
     const timer = setTimeout(async () => {
       try {
         const response = await axios.get(`http://localhost:5000/api/search/${ticker}`);
         const results = response.data.data || [];
-        // Filtrar duplicados por símbolo (mantém apenas o primeiro de cada)
+        // Filter duplicates by symbol (keep only the first of each)
         const uniqueResults = results.filter((item, index, self) => 
           index === self.findIndex(t => t.symbol === item.symbol)
         ).slice(0, 5);
@@ -60,20 +60,20 @@ function App() {
 
   const fetchStock = async (symbol, range = null) => {
     if (!symbol) return;
-    const selectedRange = range || timeRange; // Usa o range passado ou o do state
+    const selectedRange = range || timeRange; // Use passed range or state value
     setLoading(true);
     setError(null);
     setTicker(symbol);
     setSearchResults([]);
 
     try {
-      // Enviar range como parâmetro para ambos os endpoints
+      // Send range as parameter to both endpoints
       const [stockResponse, candlesResponse] = await Promise.all([
         axios.get(`http://localhost:5000/api/stock/${symbol}?range=${selectedRange}`),
         axios.get(`http://localhost:5000/api/candles/${symbol}?range=${selectedRange}`)
       ]);
 
-      // Verificar se os dados são válidos
+      // Verify if data is valid
       if (!stockResponse.data || !stockResponse.data.price || isNaN(stockResponse.data.price)) {
         throw new Error('Invalid stock data');
       }
@@ -129,18 +129,57 @@ function App() {
     return num.toLocaleString();
   };
 
-  const CustomCandlestick = ({ x, y, width, height, open, close, high, low }) => {
-    const isGreen = close > open;
+  const CustomCandlestick = (props) => {
+    const { x, y, width, height, payload } = props;
+    if (!payload || payload.open === undefined) return null;
+    
+    const { open, close, high, low } = payload;
+    const isGreen = close >= open;
     const color = isGreen ? '#10b981' : '#ef4444';
-    const bodyHeight = Math.abs(close - open) * height / (high - low);
-    const bodyY = isGreen ? y + (high - close) * height / (high - low) : y + (high - open) * height / (high - low);
+    
+    // Calculate positions based on the y-axis scale
+    const range = high - low;
+    if (range === 0) return null;
+    
+    const candleWidth = Math.max(width * 0.6, 4);
+    const xCenter = x + width / 2;
+    const xLeft = xCenter - candleWidth / 2;
+    
+    // Calculate body position (the filled rectangle)
+    const bodyTop = isGreen ? close : open;
+    const bodyBottom = isGreen ? open : close;
+    const bodyHeight = Math.abs(close - open);
+    
+    // Scale factor: height of the bar corresponds to (high - low)
+    const scale = height / range;
+    
+    const wickTop = y;
+    const wickBottom = y + height;
+    const bodyYTop = y + (high - bodyTop) * scale;
+    const bodyYBottom = y + (high - bodyBottom) * scale;
+    const bodyHeightScaled = Math.max(bodyYBottom - bodyYTop, 1);
 
     return (
       <g>
-        {/* Wick */}
-        <line x1={x + width / 2} y1={y} x2={x + width / 2} y2={y + height} stroke={color} strokeWidth="1" />
-        {/* Body */}
-        <rect x={x} y={bodyY} width={width} height={bodyHeight || 1} fill={color} />
+        {/* Wick (high to low line) */}
+        <line 
+          x1={xCenter} 
+          y1={wickTop} 
+          x2={xCenter} 
+          y2={wickBottom} 
+          stroke={color} 
+          strokeWidth={1.5} 
+        />
+        {/* Body (open to close rectangle) */}
+        <rect 
+          x={xLeft} 
+          y={bodyYTop} 
+          width={candleWidth} 
+          height={bodyHeightScaled} 
+          fill={color}
+          stroke={color}
+          strokeWidth={1}
+        />
       </g>
     );
   };
@@ -171,9 +210,9 @@ function App() {
           </header>
 
           {/* Search Section */}
-          <div className="relative mb-10 animate-fade-in delay-100">
+          <div className="relative mb-10 animate-fade-in delay-100 z-50">
             <div className="flex gap-3 md:gap-4">
-              <div className="flex-1 relative group">
+              <div className="flex-1 relative z-50">
                 <div className="relative flex items-center">
                   <div className="absolute left-4 text-neutral-500">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -383,7 +422,7 @@ function App() {
                     key={range.value}
                     onClick={() => {
                       setTimeRange(range.value);
-                      fetchStock(stockData.symbol, range.value); // Passa o range diretamente
+                      fetchStock(stockData.symbol, range.value); // Pass range directly
                     }}
                     className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
                       timeRange === range.value 
@@ -487,12 +526,6 @@ function App() {
               <div className="h-[500px] w-full mb-8 chart-container animate-fade-in">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={candleData}>
-                    <defs>
-                      <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#404040" stopOpacity={0.5}/>
-                        <stop offset="100%" stopColor="#262626" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#262626" strokeOpacity={0.5} />
                     <XAxis 
                       dataKey="date" 
@@ -501,17 +534,10 @@ function App() {
                     />
                     <YAxis 
                       yAxisId="price" 
-                      domain={['auto', 'auto']} 
+                      domain={['dataMin', 'dataMax']} 
                       stroke="#525252"
                       tick={{ fill: '#737373', fontSize: 12 }}
                       tickFormatter={(value) => `$${value}`}
-                    />
-                    <YAxis 
-                      yAxisId="volume" 
-                      orientation="right" 
-                      stroke="#525252"
-                      tick={{ fill: '#525252', fontSize: 11 }}
-                      tickFormatter={(value) => formatNumber(value)}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -521,31 +547,42 @@ function App() {
                         color: '#fff',
                         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)'
                       }}
-                      formatter={(value, name) => {
-                        if (name === 'volume') return [formatNumber(value), 'Volume'];
-                        return [`$${parseFloat(value).toFixed(2)}`, name.charAt(0).toUpperCase() + name.slice(1)];
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.95)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '12px', padding: '12px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)' }}>
+                              <p style={{ color: '#a3a3a3', marginBottom: '8px' }}>Date: {label}</p>
+                              <p style={{ color: '#fff' }}>Open: <span style={{ color: '#fbbf24' }}>${data.open?.toFixed(2)}</span></p>
+                              <p style={{ color: '#fff' }}>High: <span style={{ color: '#10b981' }}>${data.high?.toFixed(2)}</span></p>
+                              <p style={{ color: '#fff' }}>Low: <span style={{ color: '#ef4444' }}>${data.low?.toFixed(2)}</span></p>
+                              <p style={{ color: '#fff' }}>Close: <span style={{ color: '#fbbf24' }}>${data.close?.toFixed(2)}</span></p>
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
                     />
                     <Legend 
                       wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-neutral-400">{value}</span>}
+                      payload={[
+                        { value: 'Bullish', type: 'rect', color: '#10b981' },
+                        { value: 'Bearish', type: 'rect', color: '#ef4444' }
+                      ]}
                     />
-                    <Bar yAxisId="volume" dataKey="volume" fill="url(#volumeGradient)" radius={[4, 4, 0, 0]} />
-                    <Line 
+                    <Bar 
                       yAxisId="price" 
-                      type="monotone" 
-                      dataKey="close" 
-                      stroke="#f59e0b" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 6, fill: '#f59e0b', stroke: '#000', strokeWidth: 2 }}
+                      dataKey="high" 
+                      shape={<CustomCandlestick />}
+                      isAnimationActive={false}
+                      legendType="none"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
 
-            {/* Fundamentals Section - só mostra se houver dados */}
+            {/* Fundamentals Section - only shows if data exists */}
             {fundamentals && (
               fundamentals.statistics?.valuations_metrics?.market_capitalization ||
               fundamentals.statistics?.valuations_metrics?.pe_ratio ||

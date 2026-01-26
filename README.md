@@ -26,9 +26,13 @@ Unlike simple dashboards, Zenith implements a **custom proxy architecture** with
 ## Key Features
 
 * **Real-Time Data Search:** Instant access to 10,000+ US Stock tickers (e.g., AAPL, TSLA, NVDA).
+* **Dynamic Timeframes:** View stock performance across 1 Week, 1 Month, 3 Months, 6 Months, or 1 Year.
+* **Multiple Chart Types:** Switch between Area charts and Candlestick charts with OHLC data.
+* **Personal Watchlist:** Save favorite stocks to localStorage for quick access.
 * **Intelligent Caching:** Implements Redis to cache API responses (60s TTL), preventing redundant external calls and solving API rate-limiting issues.
 * **Secure Proxy:** All API keys are hidden server-side, preventing exposure in the browser.
-* **Interactive Charts:** Dynamic Area Charts showing 30-day historical performance.
+* **Key Statistics:** View Market Cap, P/E Ratio, 52-Week High/Low when available.
+* **Modern UI:** Sleek black & gold color scheme with glassmorphism effects and smooth animations.
 * **Error Handling:** Robust handling of invalid tickers and network issues.
 
 ---
