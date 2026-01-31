@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  ComposedChart, Bar, Line, Legend
+  ComposedChart, Bar, Legend
 } from 'recharts';
 
 function App() {
@@ -13,7 +13,7 @@ function App() {
   const [error, setError] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
-  const [timeRange, setTimeRange] = useState('1M'); // Time range codes: 1W, 1M, 3M, 6M, 1Y
+  const [timeRange, setTimeRange] = useState('1M');
   const [chartType, setChartType] = useState('area');
   const [loading, setLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -21,34 +21,29 @@ function App() {
 
   const POPULAR_STOCKS = ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'NVDA', 'META', 'AMD'];
 
-  // Load watchlist from localStorage
+
   useEffect(() => {
     const saved = localStorage.getItem('watchlist');
     if (saved) setWatchlist(JSON.parse(saved));
   }, []);
 
-  // Save watchlist to localStorage
+
   useEffect(() => {
     localStorage.setItem('watchlist', JSON.stringify(watchlist));
   }, [watchlist]);
 
-  // Debounced search
+
   useEffect(() => {
-    // Don't search if not actively searching or ticker too short
     if (!isSearching || ticker.length < 2) {
       setSearchResults([]);
       return;
     }
-
-    // Clear error when user starts searching
     setError(null);
-
     const timer = setTimeout(async () => {
       try {
         const response = await axios.get(`http://localhost:5000/api/search/${ticker}`);
         const results = response.data.data || [];
-        // Filter duplicates by symbol (keep only the first of each)
-        const uniqueResults = results.filter((item, index, self) => 
+        const uniqueResults = results.filter((item, index, self) =>
           index === self.findIndex(t => t.symbol === item.symbol)
         ).slice(0, 5);
         setSearchResults(uniqueResults);
@@ -56,13 +51,12 @@ function App() {
         console.error('Search error:', err);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [ticker, isSearching]);
 
   const fetchStock = async (symbol, range = null) => {
     if (!symbol) return;
-    const selectedRange = range || timeRange; // Use passed range or state value
+    const selectedRange = range || timeRange;
     setLoading(true);
     setError(null);
     setIsSearching(false);
@@ -70,20 +64,17 @@ function App() {
     setSearchResults([]);
 
     try {
-      // Send range as parameter to both endpoints
       const [stockResponse, candlesResponse] = await Promise.all([
         axios.get(`http://localhost:5000/api/stock/${symbol}?range=${selectedRange}`),
         axios.get(`http://localhost:5000/api/candles/${symbol}?range=${selectedRange}`)
       ]);
 
-      // Verify if data is valid
-      if (!stockResponse.data || !stockResponse.data.price || isNaN(stockResponse.data.price)) {
+      if (!stockResponse.data || !stockResponse.data.price) {
         throw new Error('Invalid stock data');
       }
 
       setStockData(stockResponse.data);
 
-      // Process candle data for advanced charts
       const candles = candlesResponse.data.values?.reverse().map(item => ({
         date: new Date(item.datetime).toLocaleDateString(),
         open: parseFloat(item.open),
@@ -94,7 +85,6 @@ function App() {
       })) || [];
       setCandleData(candles);
 
-      // Fetch fundamentals (optional, may not always be available)
       try {
         const fundResponse = await axios.get(`http://localhost:5000/api/fundamentals/${symbol}`);
         setFundamentals(fundResponse.data);
@@ -103,22 +93,12 @@ function App() {
       }
 
     } catch (err) {
-      console.error('Fetch error:', err);
-      
-      // Get specific error from API response
       const errorCode = err.response?.data?.code;
-      const errorMessage = err.response?.data?.message;
-      
       if (errorCode === 'RATE_LIMIT') {
-        setError("API Rate Limit: Free tier allows 8 requests/minute and 800 requests/day. Please wait a moment and try again.");
-      } else if (errorCode === 'NON_US_STOCK') {
-        setError("Exchange Not Supported: Free API only supports US stocks. For European stocks, try their US ADR (e.g., EDPFY for EDP).");
-      } else if (errorCode === 'NOT_FOUND') {
-        setError("Stock Not Found: The ticker symbol doesn't exist. Please check the spelling and try again.");
+        setError("API Rate Limit: Please wait a moment.");
       } else {
-        setError(errorMessage || "An error occurred while fetching stock data. Please try again.");
+        setError("Unable to fetch stock data.");
       }
-      
       setStockData(null);
       setCandleData(null);
       setFundamentals(null);
@@ -137,7 +117,6 @@ function App() {
     setWatchlist(watchlist.filter(s => s !== symbol));
   };
 
-  // Format large numbers
   const formatNumber = (num) => {
     if (!num) return 'N/A';
     if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
@@ -146,7 +125,6 @@ function App() {
     return num.toLocaleString();
   };
 
-  // Calculate price range for candlestick chart
   const candlePriceRange = useMemo(() => {
     if (!candleData || candleData.length === 0) return { min: 0, max: 100 };
     const lows = candleData.map(d => d.low);
@@ -158,532 +136,295 @@ function App() {
   }, [candleData]);
 
   const CustomCandlestick = (props) => {
-    const { x, y, width, height, payload, background } = props;
+    const { x, y, width, background, payload } = props;
     if (!payload || payload.open === undefined) return null;
-    
+
     const { open, close, high, low } = payload;
     const isGreen = close >= open;
     const color = isGreen ? '#10b981' : '#ef4444';
-    
-    if (high === low) return null;
-    
-    const candleWidth = Math.max(width * 0.6, 4);
-    const xCenter = x + width / 2;
-    const xLeft = xCenter - candleWidth / 2;
-    
-    // Use background to get the full chart area
+
+
     const chartHeight = background?.height || 400;
     const chartY = background?.y || 0;
-    
-    // Calculate scale using the overall price range from candlePriceRange
     const priceMin = candlePriceRange.min;
     const priceMax = candlePriceRange.max;
     const priceRange = priceMax - priceMin || 1;
-    
-    // Scale: pixels per dollar (inverted because SVG y increases downward)
     const scale = chartHeight / priceRange;
-    
-    // Convert price to Y position (higher price = lower Y in SVG)
     const priceToY = (price) => chartY + (priceMax - price) * scale;
-    
+
     const wickTop = priceToY(high);
     const wickBottom = priceToY(low);
     const bodyTop = priceToY(Math.max(open, close));
     const bodyBottom = priceToY(Math.min(open, close));
     const bodyHeightScaled = Math.max(bodyBottom - bodyTop, 1);
+    const xCenter = x + width / 2;
+    const candleWidth = Math.max(width * 0.5, 4);
 
     return (
       <g>
-        {/* Wick (high to low line) */}
-        <line 
-          x1={xCenter} 
-          y1={wickTop} 
-          x2={xCenter} 
-          y2={wickBottom} 
-          stroke={color} 
-          strokeWidth={1.5} 
-        />
-        {/* Body (open to close rectangle) */}
-        <rect 
-          x={xLeft} 
-          y={bodyTop} 
-          width={candleWidth} 
-          height={bodyHeightScaled} 
-          fill={color}
-          stroke={color}
-          strokeWidth={1}
-        />
+        <line x1={xCenter} y1={wickTop} x2={xCenter} y2={wickBottom} stroke={color} strokeWidth={1} />
+        <rect x={xCenter - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeightScaled} fill={color} />
       </g>
     );
   };
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-3 rounded-[var(--radius-md)] shadow-xl min-w-[140px]">
+          <p className="text-[var(--text-secondary)] text-xs mb-2 border-b border-[var(--border-subtle)] pb-1">{label}</p>
+          <div className="flex flex-col gap-1 text-sm font-mono">
+            {data.open !== undefined ? (
+              <>
+                <div className="flex justify-between items-center gap-3"><span className="text-[var(--text-tertiary)]">Open:</span> <span className="text-[var(--text-primary)]">${data.open.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center gap-3"><span className="text-[var(--text-tertiary)]">High:</span> <span className="text-emerald-500">${data.high.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center gap-3"><span className="text-[var(--text-tertiary)]">Low:</span> <span className="text-red-500">${data.low.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center gap-3"><span className="text-[var(--text-tertiary)]">Close:</span> <span className="text-[var(--brand-primary)]">${data.close.toFixed(2)}</span></div>
+              </>
+            ) : (
+              <div className="flex justify-between items-center gap-3"><span className="text-[var(--text-tertiary)]">Price:</span> <span className="text-[var(--brand-primary)]">${data.price?.toFixed(2)}</span></div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans">
-      <div className="relative z-10 p-4 md:p-8 lg:p-12">
-        {/* Header */}
-        <div className="max-w-7xl mx-auto">
-          <header className="mb-12 animate-fade-in">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-300 to-yellow-500 flex items-center justify-center" style={{width: '48px', height: '48px'}}>
-                  <svg style={{width: '28px', height: '28px'}} className="text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-              </div>
-              <div>
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-gradient">
-                  ZENITH
-                </h1>
-                <p className="text-neutral-500 text-sm md:text-base tracking-wide">
-                  Real-Time Financial Dashboard
-                </p>
-              </div>
-            </div>
-          </header>
+    <div className="min-h-screen text-[var(--text-primary)] font-sans selection:bg-[var(--brand-primary)] selection:text-black">
+      <div className="relative z-10 max-w-[1400px] mx-auto p-6 md:p-12">
 
-          {/* Search Section */}
-          <div className="relative mb-10 animate-fade-in delay-100 z-50">
-            <div className="flex gap-3 md:gap-4">
-              <div className="flex-1 relative z-50">
-                <div className="relative flex items-center">
-                  <div className="absolute left-4 text-neutral-500">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input 
-                    type="text" 
-                    placeholder="Search stocks (e.g., AAPL, TSLA, GOOGL)" 
-                    value={ticker}
-                    onChange={(e) => {
-                      setTicker(e.target.value.toUpperCase());
-                      setIsSearching(true);
-                    }}
-                    onFocus={() => setSearchFocused(true)}
-                    onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                    className="w-full py-4 pl-12 pr-4 rounded-2xl bg-gray-800 text-white font-medium text-lg outline-none transition-all duration-300 border border-gray-700 focus:border-amber-500/50 placeholder:text-gray-500"
-                    onKeyDown={(e) => e.key === 'Enter' && fetchStock(ticker)}
-                  />
-                </div>
-                
-                {/* Search Results Dropdown */}
-                {searchResults.length > 0 && (
-                  <div className="absolute top-full mt-3 w-full search-dropdown rounded-2xl overflow-hidden z-[100] animate-fade-in-scale">
-                    {searchResults.map((result, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => fetchStock(result.symbol)}
-                        className="p-4 hover:bg-gray-700/50 cursor-pointer border-b border-gray-700 last:border-0 transition-all duration-200 group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white group-hover:text-amber-400 transition-colors">{result.symbol}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{result.exchange || 'Stock'}</span>
-                            {result.country && (
-                              <span className="text-xs text-gray-500">{result.country}</span>
-                            )}
-                          </div>
-                          <svg style={{width: '16px', height: '16px'}} className="text-neutral-600 group-hover:text-amber-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </div>
-                        <div className="text-sm text-neutral-500 mt-1 truncate">{result.instrument_name}</div>
+
+        <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--brand-primary)] flex items-center justify-center text-black">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">ZENITH</h1>
+              <p className="text-[var(--text-secondary)] text-sm font-medium">Real-Time Financial Dashboard</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a href="https://github.com/Vasco888888" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+              </svg>
+              Vasco888888
+            </a>
+          </div>
+        </header>
+
+
+        <div className="relative mb-12 z-40">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search ticker (e.g. AAPL, NVDA)"
+                value={ticker}
+                onChange={(e) => {
+                  setTicker(e.target.value.toUpperCase());
+                  setIsSearching(true);
+                }}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                onKeyDown={(e) => e.key === 'Enter' && fetchStock(ticker)}
+                className="input-base text-lg py-4 pl-6"
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+
+              {searchResults.length > 0 && (
+                <div className="absolute top-full mt-2 w-full bg-[var(--surface-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden shadow-2xl z-50">
+                  {searchResults.map((result, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => fetchStock(result.symbol)}
+                      className="p-4 hover:bg-[var(--border-subtle)] cursor-pointer flex justify-between items-center group transition-colors"
+                    >
+                      <div>
+                        <span className="font-bold text-[var(--text-primary)] group-hover:text-[var(--brand-primary)] mr-3">{result.symbol}</span>
+                        <span className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider">{result.instrument_name}</span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <button 
-                onClick={() => fetchStock(ticker)}
-                disabled={loading}
-                className="btn-primary px-6 md:px-10 py-4 rounded-2xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    <span className="hidden md:inline">Loading...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Search</span>
-                    <svg className="w-5 h-5 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </>
-                )}
-              </button>
+                      <span className="text-xs px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-card)] text-[var(--text-secondary)]">{result.exchange}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Popular Stocks */}
-            <div className="flex gap-2 mt-5 flex-wrap items-center">
-              <span className="text-neutral-600 text-sm font-medium mr-1">Trending:</span>
-              {POPULAR_STOCKS.map((stock, idx) => (
-                <button
-                  key={stock}
-                  onClick={() => fetchStock(stock)}
-                  className="tag-pill px-4 py-1.5 rounded-full text-sm font-medium text-amber-400 hover:text-amber-300"
-                  style={{ animationDelay: `${idx * 50}ms` }}
-                >
-                  {stock}
-                </button>
+            <button
+              onClick={() => fetchStock(ticker)}
+              disabled={loading}
+              className="btn-primary w-32 text-lg"
+            >
+              {loading ? <div className="spinner" /> : 'Search'}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mt-4">
+            {POPULAR_STOCKS.map((stock) => (
+              <button
+                key={stock}
+                onClick={() => fetchStock(stock)}
+                className="tag-pill hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] cursor-pointer"
+              >
+                {stock}
+              </button>
+            ))}
+          </div>
+        </div>
+
+
+        {watchlist.length > 0 && (
+          <div className="mb-12 glass-panel p-6 rounded-[var(--radius-lg)]">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
+              <span className="w-1 h-4 bg-[var(--brand-primary)] rounded-[var(--radius-sm)]"></span>
+              Watchlist
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {watchlist.map((symbol) => (
+                <div key={symbol} className="flex items-center gap-3 pl-4 pr-2 py-2 bg-[var(--surface-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] group transition-colors">
+                  <button onClick={() => fetchStock(symbol)} className="font-mono font-bold text-[var(--text-primary)] group-hover:text-[var(--brand-primary)]">
+                    {symbol}
+                  </button>
+                  <button onClick={() => removeFromWatchlist(symbol)} className="text-[var(--text-tertiary)] hover:text-[var(--error)] p-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
               ))}
             </div>
           </div>
+        )}
 
-          {/* Watchlist Section */}
-          {watchlist.length > 0 && (
-            <div className="mb-10 glass-strong p-6 rounded-2xl animate-fade-in">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-3 text-neutral-200">
-                <span className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                </span>
-                Your Watchlist
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">{watchlist.length} items</span>
-              </h2>
-              <div className="flex gap-3 flex-wrap">
-                {watchlist.map((symbol, idx) => (
-                  <div 
-                    key={symbol} 
-                    className="watchlist-item flex items-center gap-3 px-4 py-2.5 animate-slide-in"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    <button 
-                      onClick={() => fetchStock(symbol)}
-                      className="font-mono font-semibold hover:text-amber-400 transition-colors text-white"
-                    >
-                      {symbol}
-                    </button>
-                    <button 
-                      onClick={() => removeFromWatchlist(symbol)}
-                      className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center gap-3 animate-fade-in">
-              <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-red-400 font-medium">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="mb-8 p-4 bg-[var(--surface-elevated)] border-l-4 border-[var(--error)] text-[var(--error)] rounded-[var(--radius-md)]">
+            {error}
+          </div>
+        )}
 
-          {/* Stock Data Display */}
-          {stockData && (
-            <div className="bg-gray-800 p-6 md:p-8 rounded-3xl stock-card animate-fade-in border border-gray-700">
-              
-              {/* Header with Stock Info */}
-              <div className="flex justify-between items-start mb-8 flex-wrap gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-300/20 to-yellow-500/20 flex items-center justify-center border border-amber-500/50">
-                    <span className="text-2xl font-bold text-gradient">{stockData.symbol?.slice(0, 2)}</span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h2 className="text-4xl md:text-5xl font-bold tracking-tight">{stockData.symbol}</h2>
-                      {!watchlist.includes(stockData.symbol) && (
-                        <button 
-                          onClick={() => addToWatchlist(stockData.symbol)}
-                          className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/50 flex items-center justify-center hover:bg-amber-500/20 transition-all group"
-                          title="Add to watchlist"
-                        >
-                          <svg className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                          </svg>
-                        </button>
-                      )}
-                      {watchlist.includes(stockData.symbol) && (
-                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-neutral-500 flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {timeRange === '1W' ? '1 Week' : timeRange === '1M' ? '1 Month' : timeRange === '3M' ? '3 Months' : timeRange === '6M' ? '6 Months' : '1 Year'} Performance
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="text-right">
-                  <p className="text-4xl md:text-5xl font-mono font-bold price-ticker count-up tracking-tight text-amber-400">
-                    ${stockData.price.toFixed(2)}
-                  </p>
-                  <div className={`inline-flex items-center gap-2 mt-2 px-4 py-1.5 rounded-full text-lg font-semibold ${stockData.percentChange >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
-                    {stockData.percentChange >= 0 ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                      </svg>
-                    )}
-                    {stockData.percentChange > 0 ? '+' : ''}{stockData.percentChange.toFixed(2)}%
-                  </div>
-                </div>
-              </div>
 
-              {/* Chart Controls */}
-              <div className="flex gap-4 mb-6 flex-wrap">
-              {/* Time Range Selector */}
-              <div className="flex gap-2 p-1.5 bg-gray-800 rounded-xl border border-gray-700">
-                {[
-                  { label: '1W', value: '1W' },
-                  { label: '1M', value: '1M' },
-                  { label: '3M', value: '3M' },
-                  { label: '6M', value: '6M' },
-                  { label: '1Y', value: '1Y' }
-                ].map(range => (
+        {stockData && (
+          <div className="stock-card">
+            <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-8 mb-10 border-b border-[var(--border-subtle)] pb-8">
+              <div>
+                <div className="flex items-center gap-4 mb-2">
+                  <h2 className="text-5xl md:text-6xl font-bold tracking-tight text-[var(--text-primary)]">{stockData.symbol}</h2>
                   <button
-                    key={range.value}
-                    onClick={() => {
-                      setTimeRange(range.value);
-                      fetchStock(stockData.symbol, range.value); // Pass range directly
-                    }}
-                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
-                      timeRange === range.value 
-                        ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                    }`}
+                    onClick={() => watchlist.includes(stockData.symbol) ? removeFromWatchlist(stockData.symbol) : addToWatchlist(stockData.symbol)}
+                    className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center transition-all ${watchlist.includes(stockData.symbol) ? 'bg-[var(--brand-primary)] text-black' : 'bg-[var(--surface-elevated)] text-[var(--text-secondary)] hover:bg-[var(--border-subtle)]'}`}
                   >
-                    {range.label}
+                    <svg className="w-5 h-5" fill={watchlist.includes(stockData.symbol) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
                   </button>
-                ))}
+                </div>
+                <div className="flex gap-4 items-baseline">
+                  <span className="text-4xl font-mono mobile-numbers font-medium text-[var(--brand-primary)]">${stockData.price.toFixed(2)}</span>
+                  <span className={`text-lg font-medium px-2 py-0.5 rounded-[var(--radius-sm)] ${stockData.percentChange >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {stockData.percentChange > 0 ? '+' : ''}{stockData.percentChange.toFixed(2)}%
+                  </span>
+                </div>
               </div>
 
-              {/* Chart Type Selector */}
-              <div className="flex gap-2 p-1.5 bg-gray-800 rounded-xl border border-gray-700">
-                <button
-                  onClick={() => setChartType('area')}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
-                    chartType === 'area' 
-                      ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16" />
-                  </svg>
-                  Area
-                </button>
-                <button
-                  onClick={() => setChartType('candlestick')}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center gap-2 ${
-                    chartType === 'candlestick' 
-                      ? 'bg-gradient-to-r from-amber-300 to-yellow-500 text-gray-900 shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Candlestick
-                </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex p-1 bg-[var(--surface-elevated)] rounded-[var(--radius-md)] gap-1">
+                  {['area', 'candlestick'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setChartType(type)}
+                      className={`px-4 py-2 text-sm font-medium rounded-[var(--radius-sm)] capitalize transition-all ${chartType === type ? 'bg-[var(--surface-card)] text-[var(--brand-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex p-1 bg-[var(--surface-elevated)] rounded-[var(--radius-md)] gap-1">
+                  {['1W', '1M', '3M', '6M', '1Y'].map(range => (
+                    <button
+                      key={range}
+                      onClick={() => { setTimeRange(range); fetchStock(stockData.symbol, range); }}
+                      className={`px-3 py-2 text-sm font-medium rounded-[var(--radius-sm)] transition-all ${timeRange === range ? 'bg-[var(--surface-card)] text-[var(--brand-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Chart Display */}
-            {chartType === 'area' && stockData.history && (
-              <div className="h-[400px] w-full mb-8 chart-container animate-fade-in">
-                <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[450px] w-full mb-10">
+              <ResponsiveContainer width="100%" height="100%">
+                {chartType === 'area' ? (
                   <AreaChart data={stockData.history}>
                     <defs>
                       <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.4}/>
-                        <stop offset="50%" stopColor="#d97706" stopOpacity={0.15}/>
-                        <stop offset="100%" stopColor="#d97706" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#fbbf24"/>
-                        <stop offset="50%" stopColor="#f59e0b"/>
-                        <stop offset="100%" stopColor="#d97706"/>
+                        <stop offset="5%" stopColor="#eab308" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" strokeOpacity={0.5} />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#525252" 
-                      tick={{ fill: '#737373', fontSize: 12 }}
-                      axisLine={{ stroke: '#262626' }}
-                    />
-                    <YAxis 
-                      domain={['auto', 'auto']} 
-                      stroke="#525252"
-                      tick={{ fill: '#737373', fontSize: 12 }}
-                      axisLine={{ stroke: '#262626' }}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(0, 0, 0, 0.95)', 
-                        borderColor: 'rgba(251, 191, 36, 0.3)', 
-                        borderRadius: '12px',
-                        color: '#fff',
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)'
-                      }} 
-                      itemStyle={{ color: '#fbbf24' }}
-                      labelStyle={{ color: '#737373', marginBottom: '4px' }}
-                      formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="price" 
-                      stroke="url(#strokeGradient)" 
-                      strokeWidth={3}
-                      fillOpacity={1} 
-                      fill="url(#colorPrice)" 
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                    <XAxis dataKey="date" stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis domain={['auto', 'auto']} stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="price" stroke="var(--brand-primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorPrice)" />
                   </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {chartType === 'candlestick' && candleData && (
-              <div className="h-[500px] w-full mb-8 chart-container animate-fade-in">
-                <ResponsiveContainer width="100%" height="100%">
+                ) : (
                   <ComposedChart data={candleData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" strokeOpacity={0.5} />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#525252"
-                      tick={{ fill: '#737373', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      yAxisId="price" 
-                      domain={[candlePriceRange.min, candlePriceRange.max]} 
-                      stroke="#525252"
-                      tick={{ fill: '#737373', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value.toFixed(2)}`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(0, 0, 0, 0.95)', 
-                        borderColor: 'rgba(251, 191, 36, 0.3)',
-                        borderRadius: '12px',
-                        color: '#fff',
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)'
-                      }}
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div style={{ backgroundColor: 'rgba(0, 0, 0, 0.95)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '12px', padding: '12px', boxShadow: '0 10px 40px rgba(0, 0, 0, 0.8)' }}>
-                              <p style={{ color: '#a3a3a3', marginBottom: '8px' }}>Date: {label}</p>
-                              <p style={{ color: '#fff' }}>Open: <span style={{ color: '#fbbf24' }}>${data.open?.toFixed(2)}</span></p>
-                              <p style={{ color: '#fff' }}>High: <span style={{ color: '#10b981' }}>${data.high?.toFixed(2)}</span></p>
-                              <p style={{ color: '#fff' }}>Low: <span style={{ color: '#ef4444' }}>${data.low?.toFixed(2)}</span></p>
-                              <p style={{ color: '#fff' }}>Close: <span style={{ color: '#fbbf24' }}>${data.close?.toFixed(2)}</span></p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      payload={[
-                        { value: 'Bullish', type: 'rect', color: '#10b981' },
-                        { value: 'Bearish', type: 'rect', color: '#ef4444' }
-                      ]}
-                    />
-                    <Bar 
-                      yAxisId="price" 
-                      dataKey="high" 
-                      shape={<CustomCandlestick />}
-                      isAnimationActive={false}
-                      legendType="none"
-                      background={{ fill: 'transparent' }}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                    <XAxis dataKey="date" stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                    <YAxis domain={['auto', 'auto']} stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val}`} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--text-tertiary)', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                    <Bar dataKey="high" shape={<CustomCandlestick />} isAnimationActive={false} />
                   </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+                )}
+              </ResponsiveContainer>
+            </div>
 
-            {/* Fundamentals Section - only shows if data exists */}
             {fundamentals && (
-              fundamentals.statistics?.valuations_metrics?.market_capitalization ||
-              fundamentals.statistics?.valuations_metrics?.pe_ratio ||
-              fundamentals.statistics?.stock_price_summary?.fifty_two_week_high ||
-              fundamentals.statistics?.stock_price_summary?.fifty_two_week_low
-            ) && (
-              <div className="mt-8 pt-8 border-t border-gray-700">
-                <h3 className="text-lg font-semibold mb-5 flex items-center gap-2 text-neutral-300">
-                  <svg style={{width: '20px', height: '20px'}} className="text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  Key Statistics
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {fundamentals.statistics?.valuations_metrics?.market_capitalization && (
-                    <div className="stat-card">
-                      <p className="text-neutral-500 text-sm mb-1">Market Cap</p>
-                      <p className="text-xl font-bold font-mono-numbers text-amber-400">${formatNumber(fundamentals.statistics.valuations_metrics.market_capitalization)}</p>
-                    </div>
-                  )}
-                  {fundamentals.statistics?.valuations_metrics?.pe_ratio && (
-                    <div className="stat-card">
-                      <p className="text-neutral-500 text-sm mb-1">P/E Ratio</p>
-                      <p className="text-xl font-bold font-mono-numbers">{parseFloat(fundamentals.statistics.valuations_metrics.pe_ratio).toFixed(2)}</p>
-                    </div>
-                  )}
-                  {fundamentals.statistics?.stock_price_summary?.fifty_two_week_high && (
-                    <div className="stat-card">
-                      <p className="text-neutral-500 text-sm mb-1">52W High</p>
-                      <p className="text-xl font-bold font-mono-numbers text-emerald-400">${fundamentals.statistics.stock_price_summary.fifty_two_week_high}</p>
-                    </div>
-                  )}
-                  {fundamentals.statistics?.stock_price_summary?.fifty_two_week_low && (
-                    <div className="stat-card">
-                      <p className="text-neutral-500 text-sm mb-1">52W Low</p>
-                      <p className="text-xl font-bold font-mono-numbers text-red-400">${fundamentals.statistics.stock_price_summary.fifty_two_week_low}</p>
-                    </div>
-                  )}
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[
+                  { label: 'Market Cap', value: fundamentals.statistics?.valuations_metrics?.market_capitalization, prefix: '$', format: true },
+                  { label: 'P/E Ratio', value: fundamentals.statistics?.valuations_metrics?.pe_ratio },
+                  { label: '52W High', value: fundamentals.statistics?.stock_price_summary?.fifty_two_week_high, prefix: '$', color: 'text-emerald-500' },
+                  { label: '52W Low', value: fundamentals.statistics?.stock_price_summary?.fifty_two_week_low, prefix: '$', color: 'text-red-500' },
+                ].map((stat, i) => stat.value && (
+                  <div key={i} className="stat-card">
+                    <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">{stat.label}</p>
+                    <p className={`text-xl font-mono font-medium ${stat.color || 'text-[var(--text-primary)]'}`}>
+                      {stat.prefix}{stat.format ? formatNumber(stat.value) : parseFloat(stat.value).toFixed(2)}
+                    </p>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Empty State */}
+
         {!stockData && !loading && !error && (
-          <div className="text-center py-20 animate-fade-in">
-            <div className="inline-flex items-center justify-center rounded-3xl bg-gradient-to-br from-amber-300/10 to-yellow-500/10 border border-amber-500/50 mb-6" style={{width: '96px', height: '96px'}}>
-              <svg style={{width: '48px', height: '48px'}} className="text-amber-500/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          <div className="flex flex-col items-center justify-center py-32 text-center opacity-50">
+            <div className="w-24 h-24 mb-6 rounded-[var(--radius-lg)] border-2 border-dashed border-[var(--border-subtle)] flex items-center justify-center">
+              <svg className="w-10 h-10 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
-            <h3 className="text-2xl font-semibold text-neutral-400 mb-2">Start Exploring</h3>
-            <p className="text-neutral-600 max-w-md mx-auto">Search for a stock symbol above or click on one of the trending stocks to view real-time data and charts.</p>
+            <h3 className="text-lg font-medium text-[var(--text-secondary)]">No Data Loaded</h3>
+            <p className="text-[var(--text-tertiary)] max-w-sm mt-2">Enter a ticker symbol above or select a trending stock to begin your analysis.</p>
           </div>
         )}
 
-        {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-gray-800 text-center">
-          <p className="text-gray-600 text-sm">
-            Data provided by Twelve Data API
-          </p>
-        </footer>
-        </div>
       </div>
     </div>
   );

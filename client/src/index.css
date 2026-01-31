@@ -1,128 +1,151 @@
 @import "tailwindcss";
 
-/* Global Styles */
+@theme {
+  --color-gold-50: hsl(45, 93%, 96%);
+  --color-gold-100: hsl(45, 93%, 90%);
+  --color-gold-200: hsl(45, 93%, 80%);
+  --color-gold-300: hsl(45, 93%, 70%);
+  --color-gold-400: hsl(45, 93%, 60%);
+  --color-gold-500: hsl(45, 93%, 47%);
+  --color-gold-600: hsl(45, 93%, 41%);
+  --color-gold-700: hsl(45, 93%, 35%);
+  --color-gold-800: hsl(45, 93%, 29%);
+  --color-gold-900: hsl(45, 93%, 23%);
+  --color-gold-950: hsl(45, 93%, 15%);
+}
+
+
 @layer base {
   :root {
-    --gold-light: #fbbf24;
-    --gold: #f59e0b;
-    --gold-dark: #d97706;
-    --bg-primary: #111827;
-    --bg-secondary: #1f2937;
-    --bg-card: rgba(31, 41, 55, 0.95);
-    --border-color: rgba(251, 191, 36, 0.5);
+
+
+
+    --brand-primary: hsl(45, 93%, 47%);
+    --brand-secondary: hsl(43, 40%, 45%);
+
+
+    --surface-base: hsl(220, 15%, 8%);
+
+    --surface-card: hsl(220, 15%, 11%);
+
+    --surface-elevated: hsl(220, 15%, 14%);
+
+
+
+    --success: hsl(150, 45%, 45%);
+    --error: hsl(0, 65%, 50%);
+    --text-primary: hsl(220, 10%, 96%);
+    --text-secondary: hsl(220, 8%, 65%);
+    --text-tertiary: hsl(220, 8%, 45%);
+
+
+    --border-subtle: hsl(220, 15%, 19%);
+    --border-highlight: hsl(45, 93%, 47%, 0.2);
+
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
   }
 
   html {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply text-white antialiased;
-    background: #111827;
+    background-color: var(--surface-base);
+    color: var(--text-primary);
     margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-    min-height: 100vh;
+    line-height: 1.5;
   }
 
-  * {
+
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
+    border-color: var(--border-subtle);
   }
 
-  /* Fix SVG sizing */
-  svg {
-    flex-shrink: 0;
-  }
-
-  /* Custom selection */
-  ::selection {
-    background: rgba(251, 191, 36, 0.4);
-    color: white;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    font-weight: 600;
   }
 }
 
-/* Custom utility classes */
+
 @layer utilities {
-  .text-gradient {
-    color: #fbbf24;
+
+
+  .text-balance {
+    text-wrap: balance;
   }
 
-  .card-hover {
-    @apply transition-all duration-500;
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+
+  .interactive-scale {
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s ease;
+  }
+
+  .interactive-scale:active {
+    transform: scale(0.98);
+  }
+
+
+  .glass-panel {
+    background: rgba(25, 28, 32, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+  }
+
+
+  .input-base {
+    @apply w-full bg-transparent border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-4 py-3 text-sm transition-colors duration-200 outline-none;
+    color: var(--text-primary);
+  }
+
+  .input-base:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 1px var(--brand-primary);
+
+    outline: none;
+  }
+
+  .btn-base {
+    @apply inline-flex items-center justify-center font-medium rounded-[var(--radius-md)] px-5 py-2.5 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply relative overflow-hidden font-semibold py-3 px-6 rounded-xl transition-all duration-300;
-    background: linear-gradient(135deg, #fcd34d 0%, #eab308 100%);
-    color: #111827;
-    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+    @apply inline-flex items-center justify-center font-medium rounded-[var(--radius-md)] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--brand-primary);
+    color: hsl(220, 15%, 8%);
+
   }
 
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(251, 191, 36, 0.4);
-  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: hsl(45, 93%, 52%);
 
-  .btn-primary:active {
-    transform: translateY(0);
   }
 
   .btn-secondary {
-    @apply bg-gray-800 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-xl transition-all duration-300 border border-gray-700;
+    @apply inline-flex items-center justify-center font-medium rounded-[var(--radius-md)] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
   }
 
-  .btn-secondary:hover {
-    border-color: rgba(251, 191, 36, 0.5);
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
-  }
-
-  .input-primary {
-    @apply w-full p-4 rounded-xl bg-gray-800 text-white font-medium outline-none transition-all duration-300 border border-gray-700;
-  }
-
-  .input-primary:focus {
-    border-color: rgba(251, 191, 36, 0.5);
-    box-shadow: 0 0 30px rgba(251, 191, 36, 0.15);
-  }
-
-  .input-primary::placeholder {
-    color: #525252;
-  }
-
-  /* Glassmorphism */
-  .glass {
-    background: rgba(31, 41, 55, 0.9);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(55, 65, 81, 0.8);
-  }
-
-  .glass-strong {
-    background: rgba(31, 41, 55, 0.98);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(55, 65, 81, 0.8);
-  }
-
-  /* Glow effects */
-  .glow-gold {
-    box-shadow: 0 0 30px rgba(251, 191, 36, 0.2), inset 0 0 30px rgba(251, 191, 36, 0.02);
-  }
-
-  .glow-green {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-  }
-
-  .glow-red {
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-  }
-
-  /* Mono font for numbers */
-  .font-mono-numbers {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-variant-numeric: tabular-nums;
+  .btn-secondary:hover:not(:disabled) {
+    background-color: hsl(220, 15%, 19%);
   }
 }

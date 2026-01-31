@@ -1,311 +1,138 @@
-/* Zenith Dashboard Custom Styles */
-
-/* Force SVG sizing */
 svg {
-  max-width: 100%;
-  height: auto;
-  display: inline-block;
+  display: block;
   vertical-align: middle;
 }
 
-svg.w-3 { width: 0.75rem; height: 0.75rem; }
-svg.w-4 { width: 1rem; height: 1rem; }
-svg.w-5 { width: 1.25rem; height: 1.25rem; }
-svg.w-7 { width: 1.75rem; height: 1.75rem; }
-svg.w-12 { width: 3rem; height: 3rem; }
 
-/* Smooth scrolling */
-* {
-  scroll-behavior: smooth;
-}
 
-/* Custom animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(251, 191, 36, 0.5);
-  }
-}
-
-/* Apply animations */
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
-}
-
-.animate-fade-in-scale {
-  animation: fadeInScale 0.5s ease-out forwards;
-}
-
-.animate-slide-in {
-  animation: slideIn 0.4s ease-out forwards;
-}
-
-/* Staggered animation delays */
-.delay-100 { animation-delay: 100ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-
-/* Loading skeleton */
 .skeleton {
-  background: linear-gradient(90deg, #171717 25%, #262626 50%, #171717 75%);
-  background-size: 2000px 100%;
-  animation: shimmer 2s infinite;
-  border-radius: 8px;
+  background-color: var(--surface-elevated);
+  border-radius: var(--radius-sm);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #111827;
-  border-radius: 10px;
-}
 
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #fcd34d 0%, #eab308 100%);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #fde68a 0%, #fbbf24 100%);
-}
-
-/* Stock price ticker effect */
-.price-ticker {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-}
-
-/* Chart tooltip enhancement */
 .recharts-tooltip-wrapper {
   outline: none !important;
 }
 
 .recharts-default-tooltip {
-  background: rgba(31, 41, 55, 0.98) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(251, 191, 36, 0.5) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6) !important;
+  background-color: var(--surface-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+
 }
 
-/* Hover effects */
-.hover-lift {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.recharts-tooltip-label {
+  color: var(--text-secondary) !important;
+  font-size: 0.875rem !important;
+
+  margin-bottom: 4px !important;
 }
 
-.hover-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+.recharts-tooltip-item {
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
 }
 
-/* Stock card animations */
+
+
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-subtle);
+}
+
+
 .stock-card {
   position: relative;
-  overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 24px;
 }
 
-.stock-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.5), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+
+.stat-card {
+  background-color: var(--surface-elevated);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 16px;
 }
 
-.stock-card:hover::before {
-  opacity: 1;
+
+.price-text {
+  font-family: 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
+
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-.stock-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-  border-color: rgba(251, 191, 36, 0.5);
+.trend-positive {
+  color: var(--success);
 }
 
-/* Button styles */
-button {
-  position: relative;
-  overflow: hidden;
+.trend-negative {
+  color: var(--error);
 }
 
-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-  transition: left 0.5s ease;
-}
 
-button:hover::before {
-  left: 100%;
-}
-
-/* Number counter animation */
-@keyframes countUp {
-  from {
-    opacity: 0.7;
-    transform: scale(0.98) translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.count-up {
-  animation: countUp 0.4s ease-out;
-}
-
-/* Focus styles */
-input:focus, button:focus-visible {
-  outline: none;
-}
-
-/* Loading spinner */
-.spinner {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 4px solid rgba(251, 191, 36, 0.2);
-  border-top-color: #fbbf24;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Positive/Negative number colors */
-.positive {
-  color: #10b981;
-  text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-}
-
-.negative {
-  color: #ef4444;
-  text-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-}
-
-/* Chart container */
-.chart-container {
-  position: relative;
-  padding: 1.5rem;
-  border-radius: 16px;
-  background: rgba(31, 41, 55, 0.8);
-  border: 1px solid rgba(55, 65, 81, 0.8);
-}
-
-/* Search dropdown */
-.search-dropdown {
-  background: rgba(31, 41, 55, 0.98);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(55, 65, 81, 0.8);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-}
-
-/* Tag pills */
 .tag-pill {
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
 }
 
 .tag-pill:hover {
-  background: rgba(251, 191, 36, 0.2);
-  border-color: rgba(251, 191, 36, 0.5);
-  transform: translateY(-1px);
+  color: var(--text-primary);
 }
 
-/* Stat cards */
-.stat-card {
-  background: rgba(31, 41, 55, 0.8);
-  border: 1px solid rgba(55, 65, 81, 0.8);
-  border-radius: 16px;
-  padding: 1.25rem;
-  transition: all 0.3s ease;
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-.stat-card:hover {
-  background: rgba(31, 41, 55, 0.95);
-  border-color: rgba(251, 191, 36, 0.5);
-  transform: translateY(-2px);
-}
-
-/* Watchlist item */
-.watchlist-item {
-  background: rgba(251, 191, 36, 0.08);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 12px;
-  transition: all 0.3s ease;
-}
-
-.watchlist-item:hover {
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.5);
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
-}
-
-/* Responsive text */
-@media (max-width: 768px) {
-  .price-ticker {
-    font-size: 1.75rem;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
